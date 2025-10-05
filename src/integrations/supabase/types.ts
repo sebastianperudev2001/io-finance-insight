@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      clientes: {
+        Row: {
+          activo: boolean | null
+          created_at: string
+          email: string
+          empresa: string | null
+          fecha_registro: string
+          id: string
+          metadata: Json | null
+          nombre: string
+          segmento: string | null
+          telefono: string | null
+          updated_at: string
+          valor_cliente: number | null
+        }
+        Insert: {
+          activo?: boolean | null
+          created_at?: string
+          email: string
+          empresa?: string | null
+          fecha_registro?: string
+          id?: string
+          metadata?: Json | null
+          nombre: string
+          segmento?: string | null
+          telefono?: string | null
+          updated_at?: string
+          valor_cliente?: number | null
+        }
+        Update: {
+          activo?: boolean | null
+          created_at?: string
+          email?: string
+          empresa?: string | null
+          fecha_registro?: string
+          id?: string
+          metadata?: Json | null
+          nombre?: string
+          segmento?: string | null
+          telefono?: string | null
+          updated_at?: string
+          valor_cliente?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
