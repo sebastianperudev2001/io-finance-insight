@@ -32,7 +32,7 @@ export const ChatInput = ({ onSend, disabled }: ChatInputProps) => {
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Escribe tu pregunta sobre los datos financieros..."
+        placeholder="Escribe tu pregunta sobre los clientes..."
         disabled={disabled}
         className="min-h-[60px] resize-none"
       />

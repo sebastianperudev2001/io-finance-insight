@@ -18,8 +18,100 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY no configurada');
     }
+    console.log('llego aquí')
+    // Paso 1: Determinar si la consulta requiere datos de la base de datos
+    const classificationResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          {
+            role: 'system',
+            content: `Eres un clasificador de consultas. Determina si la pregunta del usuario requiere consultar datos de la base de datos de clientes o si es una pregunta general.
 
-    // Llamar a Lovable AI para convertir la consulta en SQL
+Responde SOLO con "DATABASE" o "GENERAL".
+
+Ejemplos:
+- "Muéstrame clientes Premium" -> DATABASE
+- "Lista todos los clientes activos" -> DATABASE
+- "¿Cuántos clientes tenemos?" -> DATABASE
+- "¿Qué es IO Finance?" -> GENERAL
+- "¿Cómo funciona el sistema?" -> GENERAL
+- "Hola" -> GENERAL
+- "¿Qué puedes hacer?" -> GENERAL`
+          },
+          {
+            role: 'user',
+            content: query
+          }
+        ],
+      }),
+    });
+
+    if (!classificationResponse.ok) {
+      throw new Error('Error al clasificar la consulta');
+    }
+
+    const classificationData = await classificationResponse.json();
+    const queryType = classificationData.choices[0].message.content.trim();
+
+    console.log('Tipo de consulta:', queryType);
+
+    // Si es una pregunta general, responder directamente
+    if (queryType === 'GENERAL') {
+      const generalResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            {
+              role: 'system',
+              content: `Eres Marcio, el asistente de IO Finance. IO Finance es una plataforma de marketing inteligente que ayuda a las empresas a segmentar y gestionar campañas de email para sus clientes.
+
+Tus capacidades incluyen:
+- Consultar la base de datos de clientes usando lenguaje natural
+- Segmentar clientes por diferentes criterios (segmento, valor, estado, fecha)
+- Generar reportes en CSV
+- Crear y personalizar templates de email con variables dinámicas
+- Lanzar campañas de email personalizadas
+
+Responde de manera amigable, concisa y profesional. Usa emojis cuando sea apropiado. Si te preguntan sobre funcionalidades, menciona ejemplos concretos.`
+            },
+            {
+              role: 'user',
+              content: query
+            }
+          ],
+        }),
+      });
+
+      if (!generalResponse.ok) {
+        throw new Error('Error al generar respuesta general');
+      }
+
+      const generalData = await generalResponse.json();
+      const answer = generalData.choices[0].message.content;
+
+      return new Response(
+        JSON.stringify({ 
+          type: 'general',
+          answer: answer,
+          data: null,
+          sqlQuery: null 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Si requiere base de datos, proceder con SQL
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -88,7 +180,11 @@ IMPORTANTE:
     }
 
     return new Response(
-      JSON.stringify({ data, sqlQuery }),
+      JSON.stringify({ 
+        type: 'database',
+        data, 
+        sqlQuery 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

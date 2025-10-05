@@ -19,7 +19,7 @@ const Index = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "👋 ¡Hola! Soy tu asistente de marketing de IO Finance. Te ayudo a segmentar clientes y crear campañas personalizadas.\n\n💡 Prueba preguntas como:\n• 'Muéstrame clientes Premium activos'\n• 'Busca empresas con valor mayor a $20,000'\n• 'Lista clientes VIP registrados este año'",
+      content: "¡Hola soy Marcio! Soy el asistente de IO. Puedo ayudarte a consultar la base de datos de clientes. Por ejemplo, puedes preguntar: 'Muéstrame todos los clientes Premium' o 'Lista clientes activos con valor mayor a 15000'",
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,9 +41,20 @@ const Index = () => {
       const { data, error } = await supabase.functions.invoke('process-query', {
         body: { query: content }
       });
-
+      console.log('data', data)
       if (error) throw error;
 
+      // Manejar respuestas generales (sin datos de base de datos)
+      if (data.type === 'general') {
+        const aiMessage: Message = {
+          role: "assistant",
+          content: data.answer,
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+        return;
+      }
+
+      // Manejar respuestas con datos de base de datos
       const resultCount = data.data?.length || 0;
       const aiMessage: Message = {
         role: "assistant",
@@ -63,12 +74,12 @@ const Index = () => {
       console.error('Error:', error);
       const errorMessage: Message = {
         role: "assistant",
-        content: "⚠️ Ups, algo salió mal al procesar tu segmentación. Por favor, intenta reformular tu consulta o prueba con otro criterio.",
+        content: "⚠️ Ups, algo salió mal al procesar tu consulta. Por favor, intenta reformular tu consulta o prueba con otro criterio.",
       };
       setMessages((prev) => [...prev, errorMessage]);
       
       toast({
-        title: "Error en la segmentación",
+        title: "Error al procesar",
         description: "No pudimos procesar tu consulta. Inténtalo nuevamente.",
         variant: "destructive",
       });
@@ -140,79 +151,65 @@ const Index = () => {
     setEmailDialogOpen(true);
   };
 
-  const handleConfirmEmail = async () => {
-    setEmailDialogOpen(false);
-    
-    if (!currentQueryData) return;
+  const FIXED_EMAIL = "Aaa@gmail.com";
 
-    const recipientCount = currentQueryData.length;
-    
-    // Email hardcoded para pruebas
-    const HARDCODED_EMAIL = "test@iofinance.com";
-    
-    toast({
-      title: "🚀 Lanzando campaña...",
-      description: `Enviando ${recipientCount} email${recipientCount !== 1 ? 's' : ''} personalizado${recipientCount !== 1 ? 's' : ''}`,
+const handleConfirmEmail = async () => {
+  setEmailDialogOpen(false);
+
+  if (!currentQueryData) return;
+
+  const recipientCount = currentQueryData.length;
+
+  toast({
+    title: "Enviando campaña...",
+    description: `Procesando ${recipientCount} emails`,
+  });
+
+  try {
+    const emailPromises = currentQueryData.map(async (cliente, index) => {
+      const personalizedSubject = emailTemplate.subject
+        .replace(/\{\{nombre\}\}/g, cliente.nombre || "Cliente")
+        .replace(/\{\{empresa\}\}/g, cliente.empresa || "N/A")
+        .replace(/\{\{segmento\}\}/g, cliente.segmento || "N/A");
+
+      const personalizedBody = emailTemplate.body
+        .replace(/\{\{nombre\}\}/g, cliente.nombre || "Cliente")
+        .replace(/\{\{empresa\}\}/g, cliente.empresa || "N/A")
+        .replace(/\{\{segmento\}\}/g, cliente.segmento || "N/A")
+        .replace(/\{\{valor_cliente\}\}/g, cliente.valor_cliente?.toString() || "0")
+        .replace(/\{\{email\}\}/g, cliente.email || "N/A");
+
+      await new Promise((resolve) => setTimeout(resolve, index * 100));
+
+      // Enviar a FIXED_EMAIL en lugar del email original del cliente
+      console.log(`Email ${index + 1}/${recipientCount} enviado a ${FIXED_EMAIL}:`, {
+        subject: personalizedSubject,
+        body: personalizedBody,
+        originalClient: cliente.email,
+        clientName: cliente.nombre,
+      });
+
+      // Aquí iría la llamada real al webhook o API para enviar el correo
+
+      return { success: true, index };
     });
 
-    try {
-      // Enviar un correo por cada cliente en la consulta
-      const emailPromises = currentQueryData.map(async (cliente, index) => {
-        // Reemplazar variables del template con datos del cliente
-        const personalizedSubject = emailTemplate.subject
-          .replace(/\{\{nombre\}\}/g, cliente.nombre || 'Cliente')
-          .replace(/\{\{empresa\}\}/g, cliente.empresa || 'N/A')
-          .replace(/\{\{segmento\}\}/g, cliente.segmento || 'N/A');
-        
-        const personalizedBody = emailTemplate.body
-          .replace(/\{\{nombre\}\}/g, cliente.nombre || 'Cliente')
-          .replace(/\{\{empresa\}\}/g, cliente.empresa || 'N/A')
-          .replace(/\{\{segmento\}\}/g, cliente.segmento || 'N/A')
-          .replace(/\{\{valor_cliente\}\}/g, cliente.valor_cliente?.toString() || '0')
-          .replace(/\{\{email\}\}/g, cliente.email || 'N/A');
+    await Promise.all(emailPromises);
 
-        // Simular envío con delay progresivo para no saturar
-        await new Promise(resolve => setTimeout(resolve, index * 100));
+    toast({
+      title: "✅ Campaña enviada exitosamente",
+      description: `${recipientCount} emails enviados a ${FIXED_EMAIL}`,
+    });
+  } catch (error) {
+    console.error("Error al enviar campaña:", error);
+    toast({
+      title: "Error al enviar campaña",
+      description: "Ocurrió un error durante el envío",
+      variant: "destructive",
+    });
+  }
+};
 
-        // Aquí puedes conectar con tu webhook de n8n
-        // const response = await fetch('https://tu-webhook.n8n.cloud/email', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({
-        //     to: HARDCODED_EMAIL,
-        //     subject: personalizedSubject,
-        //     body: personalizedBody,
-        //     clientData: cliente
-        //   })
-        // });
-
-        console.log(`Email ${index + 1}/${recipientCount} enviado a ${HARDCODED_EMAIL}:`, {
-          subject: personalizedSubject,
-          body: personalizedBody,
-          originalClient: cliente.email,
-          clientName: cliente.nombre
-        });
-
-        return { success: true, index };
-      });
-
-      // Esperar a que todos los emails se procesen
-      await Promise.all(emailPromises);
-
-      toast({
-        title: "🎉 Campaña lanzada con éxito",
-        description: `${recipientCount} email${recipientCount !== 1 ? 's' : ''} personalizado${recipientCount !== 1 ? 's' : ''} enviado${recipientCount !== 1 ? 's' : ''} a ${HARDCODED_EMAIL}`,
-      });
-
-    } catch (error) {
-      console.error('Error al enviar campaña:', error);
-      toast({
-        title: "Error en el envío",
-        description: "No pudimos completar el envío de la campaña. Inténtalo de nuevo.",
-        variant: "destructive",
-      });
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -224,7 +221,7 @@ const Index = () => {
           </div>
           <div>
             <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
-              IO Finance
+              IO Marketing
             </h1>
             <p className="text-xs text-muted-foreground">Asistente de Marketing Inteligente</p>
           </div>
