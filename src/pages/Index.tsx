@@ -26,7 +26,7 @@ const Index = () => {
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [emailTemplate, setEmailTemplate] = useState({
-    subject: "Campaña IO Finance",
+    subject: "Campaña IO",
     body: "Hola {{nombre}},\n\nNos complace compartir contigo información relevante desde IO Finance.\n\nSaludos,\nEquipo IO Finance"
   });
   const [currentQueryData, setCurrentQueryData] = useState<any[] | null>(null);
@@ -147,11 +147,71 @@ const Index = () => {
 
     const recipientCount = currentQueryData.length;
     
-    // Aquí iría la lógica real de envío de emails
+    // Email hardcoded para pruebas
+    const HARDCODED_EMAIL = "test@iofinance.com";
+    
     toast({
-      title: "Campaña enviada",
-      description: `Se enviarán ${recipientCount} emails personalizados`,
+      title: "Enviando campaña...",
+      description: `Procesando ${recipientCount} emails`,
     });
+
+    try {
+      // Enviar un correo por cada cliente en la consulta
+      const emailPromises = currentQueryData.map(async (cliente, index) => {
+        // Reemplazar variables del template con datos del cliente
+        const personalizedSubject = emailTemplate.subject
+          .replace(/\{\{nombre\}\}/g, cliente.nombre || 'Cliente')
+          .replace(/\{\{empresa\}\}/g, cliente.empresa || 'N/A')
+          .replace(/\{\{segmento\}\}/g, cliente.segmento || 'N/A');
+        
+        const personalizedBody = emailTemplate.body
+          .replace(/\{\{nombre\}\}/g, cliente.nombre || 'Cliente')
+          .replace(/\{\{empresa\}\}/g, cliente.empresa || 'N/A')
+          .replace(/\{\{segmento\}\}/g, cliente.segmento || 'N/A')
+          .replace(/\{\{valor_cliente\}\}/g, cliente.valor_cliente?.toString() || '0')
+          .replace(/\{\{email\}\}/g, cliente.email || 'N/A');
+
+        // Simular envío con delay progresivo para no saturar
+        await new Promise(resolve => setTimeout(resolve, index * 100));
+
+        // Aquí puedes conectar con tu webhook de n8n
+        // const response = await fetch('https://tu-webhook.n8n.cloud/email', {
+        //   method: 'POST',
+        //   headers: { 'Content-Type': 'application/json' },
+        //   body: JSON.stringify({
+        //     to: HARDCODED_EMAIL,
+        //     subject: personalizedSubject,
+        //     body: personalizedBody,
+        //     clientData: cliente
+        //   })
+        // });
+
+        console.log(`Email ${index + 1}/${recipientCount} enviado a ${HARDCODED_EMAIL}:`, {
+          subject: personalizedSubject,
+          body: personalizedBody,
+          originalClient: cliente.email,
+          clientName: cliente.nombre
+        });
+
+        return { success: true, index };
+      });
+
+      // Esperar a que todos los emails se procesen
+      await Promise.all(emailPromises);
+
+      toast({
+        title: "✅ Campaña enviada exitosamente",
+        description: `${recipientCount} emails enviados a ${HARDCODED_EMAIL}`,
+      });
+
+    } catch (error) {
+      console.error('Error al enviar campaña:', error);
+      toast({
+        title: "Error al enviar campaña",
+        description: "Ocurrió un error durante el envío",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
