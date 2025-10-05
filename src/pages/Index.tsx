@@ -19,15 +19,15 @@ const Index = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "¡Hola! Soy el asistente de IO Finance. Puedo ayudarte a consultar la base de datos de clientes. Por ejemplo, puedes preguntar: 'Muéstrame todos los clientes Premium' o 'Lista clientes activos con valor mayor a 15000'",
+      content: "👋 ¡Hola! Soy tu asistente de marketing de IO Finance. Te ayudo a segmentar clientes y crear campañas personalizadas.\n\n💡 Prueba preguntas como:\n• 'Muéstrame clientes Premium activos'\n• 'Busca empresas con valor mayor a $20,000'\n• 'Lista clientes VIP registrados este año'",
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [emailTemplate, setEmailTemplate] = useState({
-    subject: "Campaña IO",
-    body: "Hola {{nombre}},\n\nNos complace compartir contigo información relevante desde IO Finance.\n\nSaludos,\nEquipo IO Finance"
+    subject: "{{nombre}}, tenemos una propuesta especial para {{empresa}}",
+    body: "Hola {{nombre}},\n\nDesde IO Finance queremos agradecerte por ser parte de nuestro segmento {{segmento}}.\n\nHemos preparado contenido exclusivo pensado especialmente para {{empresa}}.\n\n¿Te gustaría conocer más sobre nuestras soluciones financieras?\n\nSaludos cordiales,\nEquipo de Marketing - IO Finance"
   });
   const [currentQueryData, setCurrentQueryData] = useState<any[] | null>(null);
   const { toast } = useToast();
@@ -47,7 +47,7 @@ const Index = () => {
       const resultCount = data.data?.length || 0;
       const aiMessage: Message = {
         role: "assistant",
-        content: `He encontrado ${resultCount} cliente${resultCount !== 1 ? 's' : ''} que coinciden con tu consulta. Puedes descargar el reporte CSV, editar el template de email o enviar la campaña.`,
+        content: `🎯 Perfecto! Encontré **${resultCount} cliente${resultCount !== 1 ? 's' : ''}** que coinciden con tu segmentación.\n\n📊 **Próximos pasos:**\n• Descarga el reporte en CSV\n• Personaliza el template de email\n• Lanza tu campaña de marketing`,
         queryData: data.data,
         sqlQuery: data.sqlQuery
       };
@@ -56,20 +56,20 @@ const Index = () => {
       setCurrentQueryData(data.data);
       
       toast({
-        title: "Consulta procesada",
-        description: `Se encontraron ${resultCount} resultados`,
+        title: "✅ Segmentación completada",
+        description: `${resultCount} cliente${resultCount !== 1 ? 's' : ''} listo${resultCount !== 1 ? 's' : ''} para tu campaña`,
       });
     } catch (error) {
       console.error('Error:', error);
       const errorMessage: Message = {
         role: "assistant",
-        content: "Lo siento, hubo un error al procesar tu consulta. Por favor intenta de nuevo.",
+        content: "⚠️ Ups, algo salió mal al procesar tu segmentación. Por favor, intenta reformular tu consulta o prueba con otro criterio.",
       };
       setMessages((prev) => [...prev, errorMessage]);
       
       toast({
-        title: "Error",
-        description: "No se pudo procesar la consulta",
+        title: "Error en la segmentación",
+        description: "No pudimos procesar tu consulta. Inténtalo nuevamente.",
         variant: "destructive",
       });
     } finally {
@@ -80,8 +80,8 @@ const Index = () => {
   const handleDownloadCSV = (data: any[]) => {
     if (!data || data.length === 0) {
       toast({
-        title: "Sin datos",
-        description: "No hay datos para descargar",
+        title: "Sin resultados",
+        description: "No hay clientes en esta segmentación para exportar",
         variant: "destructive",
       });
       return;
@@ -111,8 +111,8 @@ const Index = () => {
     document.body.removeChild(link);
 
     toast({
-      title: "Reporte descargado",
-      description: `${data.length} registros descargados exitosamente`,
+      title: "📥 Reporte exportado",
+      description: `${data.length} cliente${data.length !== 1 ? 's' : ''} descargado${data.length !== 1 ? 's' : ''} en formato CSV`,
     });
   };
 
@@ -123,16 +123,16 @@ const Index = () => {
   const handleSaveTemplate = (subject: string, body: string) => {
     setEmailTemplate({ subject, body });
     toast({
-      title: "Template guardado",
-      description: "El template ha sido actualizado correctamente",
+      title: "✅ Template actualizado",
+      description: "Tu plantilla de email está lista para la campaña",
     });
   };
 
   const handleSendCampaign = () => {
     if (!currentQueryData || currentQueryData.length === 0) {
       toast({
-        title: "Sin destinatarios",
-        description: "No hay clientes en la consulta actual",
+        title: "Sin audiencia",
+        description: "Primero debes segmentar clientes para lanzar una campaña",
         variant: "destructive",
       });
       return;
@@ -151,8 +151,8 @@ const Index = () => {
     const HARDCODED_EMAIL = "test@iofinance.com";
     
     toast({
-      title: "Enviando campaña...",
-      description: `Procesando ${recipientCount} emails`,
+      title: "🚀 Lanzando campaña...",
+      description: `Enviando ${recipientCount} email${recipientCount !== 1 ? 's' : ''} personalizado${recipientCount !== 1 ? 's' : ''}`,
     });
 
     try {
@@ -200,15 +200,15 @@ const Index = () => {
       await Promise.all(emailPromises);
 
       toast({
-        title: "✅ Campaña enviada exitosamente",
-        description: `${recipientCount} emails enviados a ${HARDCODED_EMAIL}`,
+        title: "🎉 Campaña lanzada con éxito",
+        description: `${recipientCount} email${recipientCount !== 1 ? 's' : ''} personalizado${recipientCount !== 1 ? 's' : ''} enviado${recipientCount !== 1 ? 's' : ''} a ${HARDCODED_EMAIL}`,
       });
 
     } catch (error) {
       console.error('Error al enviar campaña:', error);
       toast({
-        title: "Error al enviar campaña",
-        description: "Ocurrió un error durante el envío",
+        title: "Error en el envío",
+        description: "No pudimos completar el envío de la campaña. Inténtalo de nuevo.",
         variant: "destructive",
       });
     }
@@ -226,7 +226,7 @@ const Index = () => {
             <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
               IO Finance
             </h1>
-            <p className="text-xs text-muted-foreground">Asistente de Análisis Financiero</p>
+            <p className="text-xs text-muted-foreground">Asistente de Marketing Inteligente</p>
           </div>
           <div className="ml-auto">
             <BarChart3 className="text-muted-foreground" size={24} />
