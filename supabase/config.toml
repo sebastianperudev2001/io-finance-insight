@@ -1,4 +1,4 @@
 project_id = "tbclhhzluirczygaaekr"
 
 [functions.process-query]
-verify_jwt = true
+verify_jwt = false

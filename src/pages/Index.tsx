@@ -1,41 +1,35 @@
 import { useState } from "react";
 import { ChatMessage } from "@/components/ChatMessage";
 import { ChatInput } from "@/components/ChatInput";
+import { QueryActionButtons } from "@/components/QueryActionButtons";
+import { TemplateEditor } from "@/components/TemplateEditor";
 import { EmailConfirmDialog } from "@/components/EmailConfirmDialog";
-import { EmailTemplateDialog } from "@/components/EmailTemplateDialog";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { TrendingUp, BarChart3 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
-  hasActions?: boolean;
-  queryResults?: any[];
+  queryData?: any[];
+  sqlQuery?: string;
 }
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "¡Hola! Soy el asistente de IO Finance. Puedo ayudarte a analizar datos de clientes y generar campañas de marketing. Por ejemplo, prueba: 'Muéstrame todos los clientes Premium activos'",
+      content: "¡Hola! Soy el asistente de IO Finance. Puedo ayudarte a consultar la base de datos de clientes. Por ejemplo, puedes preguntar: 'Muéstrame todos los clientes Premium' o 'Lista clientes activos con valor mayor a 15000'",
     },
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [emailTemplate, setEmailTemplate] = useState({
-    subject: "Campaña de Marketing - IO Finance",
-    body: `Estimado/a {{nombre}},
-
-Nos complace contactarte desde IO Finance.
-
-En {{empresa}}, sabemos que el éxito financiero requiere las herramientas adecuadas.
-
-Saludos cordiales,
-Equipo IO Finance`
+    subject: "Campaña IO Finance",
+    body: "Hola {{nombre}},\n\nNos complace compartir contigo información relevante desde IO Finance.\n\nSaludos,\nEquipo IO Finance"
   });
-  const [currentResults, setCurrentResults] = useState<any[]>([]);
+  const [currentQueryData, setCurrentQueryData] = useState<any[] | null>(null);
   const { toast } = useToast();
 
   const handleSendMessage = async (content: string) => {
@@ -44,31 +38,35 @@ Equipo IO Finance`
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("process-query", {
-        body: { query: content },
+      const { data, error } = await supabase.functions.invoke('process-query', {
+        body: { query: content }
       });
 
       if (error) throw error;
 
-      if (data.success) {
-        setCurrentResults(data.results || []);
-        const aiMessage: Message = {
-          role: "assistant",
-          content: data.message,
-          hasActions: data.results && data.results.length > 0,
-          queryResults: data.results,
-        };
-        setMessages((prev) => [...prev, aiMessage]);
-      } else {
-        throw new Error(data.error || "Error al procesar la consulta");
-      }
+      const resultCount = data.data?.length || 0;
+      const aiMessage: Message = {
+        role: "assistant",
+        content: `He encontrado ${resultCount} cliente${resultCount !== 1 ? 's' : ''} que coinciden con tu consulta. Puedes descargar el reporte CSV, editar el template de email o enviar la campaña.`,
+        queryData: data.data,
+        sqlQuery: data.sqlQuery
+      };
+      
+      setMessages((prev) => [...prev, aiMessage]);
+      setCurrentQueryData(data.data);
+      
+      toast({
+        title: "Consulta procesada",
+        description: `Se encontraron ${resultCount} resultados`,
+      });
     } catch (error) {
-      console.error("Error:", error);
+      console.error('Error:', error);
       const errorMessage: Message = {
         role: "assistant",
-        content: "Lo siento, hubo un error al procesar tu consulta. Por favor, intenta reformularla.",
+        content: "Lo siento, hubo un error al procesar tu consulta. Por favor intenta de nuevo.",
       };
       setMessages((prev) => [...prev, errorMessage]);
+      
       toast({
         title: "Error",
         description: "No se pudo procesar la consulta",
@@ -79,25 +77,28 @@ Equipo IO Finance`
     }
   };
 
-  const handleDownloadCSV = () => {
-    if (currentResults.length === 0) {
+  const handleDownloadCSV = (data: any[]) => {
+    if (!data || data.length === 0) {
       toast({
-        title: "No hay datos",
-        description: "No hay resultados para descargar",
+        title: "Sin datos",
+        description: "No hay datos para descargar",
         variant: "destructive",
       });
       return;
     }
 
-    const headers = Object.keys(currentResults[0]).join(",");
-    const rows = currentResults
-      .map((row) =>
-        Object.values(row)
-          .map((val) => `"${val}"`)
-          .join(",")
+    const headers = Object.keys(data[0]);
+    const csvContent = [
+      headers.join(','),
+      ...data.map(row => 
+        headers.map(header => {
+          const value = row[header];
+          return typeof value === 'string' && value.includes(',') 
+            ? `"${value}"` 
+            : value;
+        }).join(',')
       )
-      .join("\n");
-    const csvContent = `${headers}\n${rows}`;
+    ].join('\n');
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
@@ -111,7 +112,7 @@ Equipo IO Finance`
 
     toast({
       title: "Reporte descargado",
-      description: `Se descargaron ${currentResults.length} registros en formato CSV.`,
+      description: `${data.length} registros descargados exitosamente`,
     });
   };
 
@@ -123,15 +124,15 @@ Equipo IO Finance`
     setEmailTemplate({ subject, body });
     toast({
       title: "Template guardado",
-      description: "El template de email ha sido actualizado.",
+      description: "El template ha sido actualizado correctamente",
     });
   };
 
   const handleSendCampaign = () => {
-    if (currentResults.length === 0) {
+    if (!currentQueryData || currentQueryData.length === 0) {
       toast({
-        title: "No hay destinatarios",
-        description: "No hay clientes seleccionados para la campaña",
+        title: "Sin destinatarios",
+        description: "No hay clientes en la consulta actual",
         variant: "destructive",
       });
       return;
@@ -139,13 +140,17 @@ Equipo IO Finance`
     setEmailDialogOpen(true);
   };
 
-  const handleConfirmCampaign = () => {
+  const handleConfirmEmail = async () => {
     setEmailDialogOpen(false);
     
-    // Aquí se integraría con el servicio de email (Resend u otro)
+    if (!currentQueryData) return;
+
+    const recipientCount = currentQueryData.length;
+    
+    // Aquí iría la lógica real de envío de emails
     toast({
-      title: "Campaña programada",
-      description: `Se enviarán ${currentResults.length} emails personalizados a los clientes seleccionados.`,
+      title: "Campaña enviada",
+      description: `Se enviarán ${recipientCount} emails personalizados`,
     });
   };
 
@@ -175,14 +180,18 @@ Equipo IO Finance`
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto space-y-4 pr-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
             {messages.map((message, index) => (
-              <ChatMessage
-                key={index}
-                role={message.role}
+              <ChatMessage 
+                key={index} 
+                role={message.role} 
                 content={message.content}
-                hasActions={message.hasActions}
-                onDownloadCSV={handleDownloadCSV}
-                onEditTemplate={handleEditTemplate}
-                onSendCampaign={handleSendCampaign}
+                actions={message.queryData && message.queryData.length > 0 ? (
+                  <QueryActionButtons
+                    onDownloadCSV={() => handleDownloadCSV(message.queryData!)}
+                    onEditTemplate={handleEditTemplate}
+                    onSendCampaign={handleSendCampaign}
+                    disabled={isLoading}
+                  />
+                ) : undefined}
               />
             ))}
             {isLoading && (
@@ -204,18 +213,20 @@ Equipo IO Finance`
         </div>
       </main>
 
-      {/* Email Template Dialog */}
-      <EmailTemplateDialog
+      {/* Template Editor */}
+      <TemplateEditor
         open={templateDialogOpen}
         onOpenChange={setTemplateDialogOpen}
         onSave={handleSaveTemplate}
+        initialSubject={emailTemplate.subject}
+        initialBody={emailTemplate.body}
       />
 
-      {/* Campaign Confirmation Dialog */}
+      {/* Email Confirmation Dialog */}
       <EmailConfirmDialog
         open={emailDialogOpen}
         onOpenChange={setEmailDialogOpen}
-        onConfirm={handleConfirmCampaign}
+        onConfirm={handleConfirmEmail}
       />
     </div>
   );
