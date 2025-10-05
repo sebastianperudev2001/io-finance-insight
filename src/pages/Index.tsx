@@ -41,7 +41,7 @@ const Index = () => {
       const { data, error } = await supabase.functions.invoke('process-query', {
         body: { query: content }
       });
-      console.log('data', data)
+
       if (error) throw error;
 
       // Manejar respuestas generales (sin datos de base de datos)
@@ -56,9 +56,10 @@ const Index = () => {
 
       // Manejar respuestas con datos de base de datos
       const resultCount = data.data?.length || 0;
+      
       const aiMessage: Message = {
         role: "assistant",
-        content: `🎯 Perfecto! Encontré **${resultCount} cliente${resultCount !== 1 ? 's' : ''}** que coinciden con tu segmentación.\n\n📊 **Próximos pasos:**\n• Descarga el reporte en CSV\n• Personaliza el template de email\n• Lanza tu campaña de marketing`,
+        content: data.answer, // Siempre usar la respuesta personalizada del AI
         queryData: data.data,
         sqlQuery: data.sqlQuery
       };
